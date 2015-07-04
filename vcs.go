@@ -10,7 +10,7 @@
 // Thanks to jingweno whose work basically tweaks the Go authors original so:
 // - becomes a new package named 'vcs' (vs 'main' for the orig pkg)
 // - renames some structs/methods to drop redundant 'vcs' prefixes as
-// the package is now named vcs so vcs.vcs<Blah> is unneeded verbosity
+// The package is now named vcs so vcs.vcs<Blah> is unneeded verbosity
 // - makes various structs, fields and methods public (capitalized)
 //
 // Original Go Authors copyright:
@@ -18,6 +18,9 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// Package vcs is used for version control system (vcs) interactions and
+// plugins.  It is based on the Go authors vcs.go file and some tweaks from
+// jingweno, thanks folks!
 package vcs
 
 import (
