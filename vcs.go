@@ -2,15 +2,14 @@
 // been modified it to use the 'dvln/out' output package and there will be
 // further command updates and tweaks added over time although the goal is
 // to keep it recognizably similar to the Go Authors vcs.go to make it easy
-// to update with core improvements.  See dvlnvcs.go in the same package
-// for dvln's use of this package.
+// to update with core improvements.
 //
 // Initial copy was from jingweno's derivation on the Go std lib vcs.go package:
 // - github.com/jingweno/nut (/vendor/_nuts/golang.org/x/tools/go/vcs/vcs.go)
 // Thanks to jingweno whose work basically tweaks the Go authors original so:
 // - becomes a new package named 'vcs' (vs 'main' for the orig pkg)
-// - renames some structs/methods to drop redundant 'vcs' prefixes as
-// The package is now named vcs so vcs.vcs<Blah> is unneeded verbosity
+// - renames some structs/methods to drop redundant 'vcs' prefixes since the
+// package is now named vcs so vcs.vcs<Blah> is unneeded verbosity
 // - makes various structs, fields and methods public (capitalized)
 //
 // Original Go Authors copyright:
@@ -20,7 +19,7 @@
 
 // Package vcs is used for version control system (vcs) interactions and
 // plugins.  It is based on the Go authors vcs.go file and some tweaks from
-// jingweno, thanks folks!
+// jingweno on the nut project, thanks folks!
 package vcs
 
 import (
@@ -35,6 +34,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/dvln/out"
 )
 
 // Verbose enables verbose operation logging.
@@ -59,8 +60,8 @@ type Cmd struct {
 
 	LogCmd string // command to list repository changelogs in an XML format
 
-	Scheme  []string
-	PingCmd string
+	Scheme  []string // identify vcs access schemes (ssh, http, https, git, etc)
+	PingCmd string   // command to see which scheme (ssh, http, git, etc) is good
 }
 
 // A TagCmd describes a command to list available tags
@@ -88,6 +89,10 @@ func ByCmd(cmd string) *Cmd {
 	}
 	return nil
 }
+
+// The commands (Cmd) use substitution on the various commands to
+// run basic operations on a given VCS repo (in whatever dir it
+// should exist in)
 
 // vcsHg describes how to use Mercurial.
 var vcsHg = &Cmd{
@@ -190,7 +195,8 @@ func (v *Cmd) run(dir string, cmd string, keyval ...string) error {
 	return err
 }
 
-// runVerboseOnly is like run but only generates error output to standard error in verbose mode.
+// runVerboseOnly is like run but only generates error output to standard error
+// in verbose mode.
 func (v *Cmd) runVerboseOnly(dir string, cmd string, keyval ...string) error {
 	_, err := v.run1(dir, cmd, keyval, false)
 	return err
@@ -214,8 +220,7 @@ func (v *Cmd) run1(dir string, cmdline string, keyval []string, verbose bool) ([
 
 	_, err := exec.LookPath(v.Cmd)
 	if err != nil {
-		fmt.Fprintf(os.Stderr,
-			"go: missing %s command. See http://golang.org/s/gogetcmd\n",
+		out.Errorf("go: missing %s command. See http://golang.org/s/gogetcmd\n",
 			v.Name)
 		return nil, err
 	}
@@ -224,22 +229,22 @@ func (v *Cmd) run1(dir string, cmdline string, keyval []string, verbose bool) ([
 	cmd.Dir = dir
 	cmd.Env = envForDir(cmd.Dir)
 	if ShowCmd {
-		fmt.Printf("cd %s\n", dir)
-		fmt.Printf("%s %s\n", v.Cmd, strings.Join(args, " "))
+		out.Printf("cd %s\n", dir)
+		out.Printf("%s %s\n", v.Cmd, strings.Join(args, " "))
 	}
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
 	err = cmd.Run()
-	out := buf.Bytes()
+	output := buf.Bytes()
 	if err != nil {
 		if verbose || Verbose {
-			fmt.Fprintf(os.Stderr, "# cd %s; %s %s\n", dir, v.Cmd, strings.Join(args, " "))
-			os.Stderr.Write(out)
+			out.Issuef("# cd %s; %s %s\n", dir, v.Cmd, strings.Join(args, " "))
+			out.Issue(fmt.Sprintf("%s", output))
 		}
 		return nil, err
 	}
-	return out, nil
+	return output, nil
 }
 
 // Ping pings the repo to determine if scheme used is valid.
@@ -317,10 +322,12 @@ func (v *Cmd) TagSync(dir, tag string) error {
 // Log logs the changes for the repo in dir.
 // dir must be a valid VCS repo compatible with v.
 func (v *Cmd) Log(dir, logTemplate string) ([]byte, error) {
+	//FIXME: erik: why is log doing a Download first?
 	if err := v.Download(dir); err != nil {
 		return []byte{}, err
 	}
 
+	//FIXME: erik: more flexibility around log is needed, consider
 	const N = 50 // how many revisions to grab
 	return v.runOutput(dir, v.LogCmd, "limit", strconv.Itoa(N), "template", logTemplate)
 }
